@@ -12,6 +12,7 @@ import {
   Languages
 } from 'lucide-react';
 import type { AppMode, Language } from '../types';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 
 interface HeaderProps {
   currentMode: AppMode;
@@ -70,9 +71,12 @@ export const Header: React.FC<HeaderProps> = ({
             <Camera size={14} />
             <span className="font-mono">NIR/NDRE: SYNC</span>
           </div>
-          <div className="status-chip" title="Cloud MQTT Broker connected">
+          <div className="status-chip" title={isSupabaseConfigured() ? "Connected to live Supabase cloud backend" : "Local mode active. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env to connect live Supabase"}>
+            <span className={`pulse-dot ${isSupabaseConfigured() ? 'green' : 'amber'}`}></span>
             <Wifi size={14} />
-            <span className="font-mono">MQTT: OK</span>
+            <span className="font-mono">
+              {isSupabaseConfigured() ? 'SUPABASE: LIVE' : 'SUPABASE: LOCAL'}
+            </span>
           </div>
         </div>
 

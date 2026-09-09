@@ -12,6 +12,7 @@ import {
 import L from 'leaflet';
 import { MAHARASHTRA_CLUSTERS } from '../data/maharashtraClusters';
 import type { OutbreakCluster, Language } from '../types';
+import { cropsapService } from '../services/cropsapService';
 
 interface GovtGISDashboardProps {
   currentLang: Language;
@@ -25,6 +26,27 @@ export const GovtGISDashboard: React.FC<GovtGISDashboardProps> = ({ currentLang 
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    const loadClusters = async () => {
+      const data = await cropsapService.getClusters();
+      setClusters(data);
+      if (data.length > 0) {
+        setSelectedCluster(data[1] || data[0]);
+      }
+    };
+    loadClusters();
+
+    // Subscribe to realtime cluster updates
+    const unsubscribe = cropsapService.subscribeToClusters(() => {
+      loadClusters();
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   // Translations
   const t = {
@@ -87,9 +109,20 @@ export const GovtGISDashboard: React.FC<GovtGISDashboardProps> = ({ currentLang 
     });
   }, [clusters]);
 
-  const handleSendBroadcast = () => {
+  const handleSendBroadcast = async () => {
     setBroadcastSuccess(true);
-    // Mark cluster as advisorySent
+    const msg = `[महाराष्ट्र कृषी विभाग - सावधतेचा इशारा]\nतालुका ${selectedCluster.taluka} मधील शेतकरी बांधवांनो, आपल्या भागात ${selectedCluster.crop} पिकावर ${selectedCluster.threatMr} चे प्रमाण आर्थिक नुकसान पातळीच्या (ETL) वर गेले आहे.\nतातडीने शेताची पाहणी करा व ARGO AgriVision ॲपमध्ये सुचवल्यानुसार जैविक/रासायनिक प्रतिबंधात्मक फवारणी सुरू करा.`;
+    
+    // Record in Supabase
+    await cropsapService.dispatchAdvisory(
+      selectedCluster.id,
+      selectedCluster.taluka,
+      selectedCluster.district,
+      msg,
+      1480
+    );
+
+    // Mark cluster as advisorySent locally
     setClusters(prev => prev.map(c => c.id === selectedCluster.id ? { ...c, advisorySent: true } : c));
     setTimeout(() => {
       setBroadcastModalOpen(false);
